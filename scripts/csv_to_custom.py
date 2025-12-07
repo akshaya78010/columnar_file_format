@@ -1,7 +1,11 @@
 import csv
 from io import BytesIO
 import argparse
-from scripts.utils import *
+import sys, os
+
+# Make utils importable when running from CLI
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from utils import *
 
 def detect_type(values):
     is_int = True
@@ -78,7 +82,6 @@ def write_custom(csv_path, out_path):
     data = rows[1:]
     num_rows = len(data)
 
-    # build column values
     columns = [[] for _ in header]
     for row in data:
         for i in range(len(header)):
@@ -87,7 +90,6 @@ def write_custom(csv_path, out_path):
     col_meta = []
     col_blocks = []
 
-    # Serialize each column
     for i, name in enumerate(header):
         vals = columns[i]
         t = detect_type(vals)
@@ -101,7 +103,6 @@ def write_custom(csv_path, out_path):
         })
         col_blocks.append(compressed)
 
-    # Build header
     header_buf = BytesIO()
     header_buf.write(pack_u64(num_rows))
     header_buf.write(pack_u16(len(header)))
@@ -113,12 +114,11 @@ def write_custom(csv_path, out_path):
         header_buf.write(pack_u8(meta["type"]))
         header_buf.write(pack_u64(meta["uncompressed_size"]))
         header_buf.write(pack_u64(meta["compressed_size"]))
-        header_buf.write(pack_u64(0))   # placeholder offset
+        header_buf.write(pack_u64(0))  # placeholder
 
     header_bytes = header_buf.getvalue()
     header_length = len(header_bytes)
 
-    # Write file (fix: w+b)
     with open(out_path, "w+b") as out:
         out.write(MAGIC)
         out.write(pack_u8(VERSION))
@@ -134,7 +134,6 @@ def write_custom(csv_path, out_path):
             out.write(blob)
             current_offset += len(blob)
 
-        # Patch offsets
         header_start = 8 + 1 + 7 + 8
         out.seek(header_start)
 
@@ -156,7 +155,6 @@ def main():
     ap.add_argument("csv", help="input CSV file")
     ap.add_argument("out", help="output SCF file")
     args = ap.parse_args()
-
     write_custom(args.csv, args.out)
 
 if __name__ == "__main__":
